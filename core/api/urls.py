@@ -1,0 +1,35 @@
+from django.urls import path
+from core.api import views
+
+urlpatterns = [
+    path("user-create/", views.UserCreateAPIView.as_view()),
+    path("user-list/", views.UserListAPIView.as_view()),
+    path("user-retrieve-update-delete/", views.UserRetrieveUpdateDestroyAPIView.as_view()),
+    path("user-retrieve/<int:id>/", views.UserRetrieveAPIView.as_view()),
+    path("profile-retrieve-update-delete/<int:id>/", views.ProfileRetrieveUpdateDestroyAPIView.as_view()),
+    path("supplier-list/", views.SupplierListAPIView.as_view()),
+    path("settings/", views.SiteSettingsListAPIView.as_view()),
+    path("banner-list/", views.BannerListAPIView.as_view()),
+    path("category-list/", views.ProductCategoryListAPIView.as_view()),
+    path("short-product-list/", views.ShortProductListAPIView.as_view()),
+    path("product-list/", views.ProductListAPIView.as_view()),
+    path("category-product-list/<int:id>/", views.CategoryProductListAPIView.as_view()),
+    path("recent-product-list/", views.RecentProductListAPIView.as_view()),
+    path("application-create/", views.ApplicationCreateAPIView.as_view()),
+    path("socialmedia-list/", views.SocialMediaListAPIView.as_view()),
+    path("advantage-list/", views.AdvantageListAPIView.as_view()),
+    path("activity-list/", views.ActivityListAPIView.as_view()),
+    path("service-list/", views.ServiceListAPIView.as_view()),
+    path("mission-list/", views.MissionListAPIView.as_view()),
+    path("user-basketitem-list/", views.UserBasketItemListAPIView.as_view()),
+    path("basketitem-create/", views.BasketItemCreateAPIView.as_view()),
+    path("basketitem-update-delete/<int:id>/", views.BasketItemRetrieveUpdateDestroyAPIView.as_view()),
+    path("basketitem-clean/", views.BasketCleanAPIView.as_view()),
+
+    path("product-create/", views.ProductCreateAPIView.as_view()),
+    path("product-retrieve/<int:id>/", views.ProductRetrieveAPIView.as_view()),
+    path("product-update-delete/<int:id>/", views.ProductRetrieveUpdateDestroyAPIView.as_view()),
+    path("article-retrieve-update-delete/<int:id>/", views.ArticleRetrieveUpdateDestroyAPIView.as_view()),
+    path("order-create/", views.OrderCreateAPIView.as_view()),
+    path("wanted-product-create/", views.WantedProductCreateAPIView.as_view()),
+]
