@@ -11,12 +11,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-&$eds9q*826mv(gihrxjse1e%jmo(-vii890*wc7ju+8u$)@3='
 
-DEBUG = True
+# DEBUG = True
+DEBUG=False
 
 ALLOWED_HOSTS = [
     "api.tehmidinsaat.com",
     "tehmidinsaat.com",
     "www.tehmidinsaat.com",
+]
+
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://api.tehmidinsaat.com",
 ]
 
 INSTALLED_APPS = [
