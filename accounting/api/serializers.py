@@ -32,6 +32,7 @@ class PurchaseListSerializer(serializers.ModelSerializer):
         if obj.purchaselist_purchases.exists():
             supplier = obj.purchaselist_purchases.first().supplier
             return supplier.username
+            # return CustomUserSerializer(instance=supplier).data
         return None
     
     def get_amount(self, obj):
@@ -133,6 +134,16 @@ class SaleListSerializer(serializers.ModelSerializer):
     
     def get_sale_status(self, obj):
         return obj.salelist_sales.first().status if obj.salelist_sales.exists() else None
+    
+# class ShortSaleSerializer(serializers.ModelSerializer):
+#     sale = serializers.SerializerMethodField()
+#     class Meta:
+#         model = Sale
+#         fields = ("id", "sale")
+
+#     def get_sale(self, obj):
+#         customer = obj.customer.first_name + " " + obj.customer.last_name if obj.customer.first_name and obj.customer.last_name else obj.customer.username
+#         return customer + " - " + obj.product.name + " - " + obj.product.store.name
 
 class ShortSaleSerializer(serializers.ModelSerializer):
     sale = serializers.CharField(source="sale_text")
@@ -175,11 +186,20 @@ class SaleListRetrieveSerializer(serializers.ModelSerializer):
         return total_old_debt if total_old_debt > 0 else 0
 
     def get_new_debt(self, obj):
+        # customer = obj.salelist_sales.first().customer
+        # old_sales = Sale.objects.filter(customer=customer, status="S", salelist__id__lt=obj.id)
+        # total_old_price = sum([sale.price * sale.amount for sale in old_sales])
         new_sales = Sale.objects.filter(salelist = obj, status="S")
         total_new_price = sum([sale.price * sale.amount for sale in new_sales])
+        # total_new_debt = total_old_price + total_new_price - self.get_total_paid_amount(obj)
+        # if self.get_old_debt(obj) == 0:
+        #     if total_new_debt > 0:
+        #         return total_new_debt
+        #     return 0
         return total_new_price
 
     def get_total_paid_amount(self, obj):
+        # customer = obj.salelist_sales.first().customer
         customer = self.get_customer(obj)
         payments = Payment.objects.filter(customer = customer)
         return sum([payment.amount for payment in payments])
@@ -227,7 +247,7 @@ class SaleCreateSerializer(serializers.ModelSerializer):
 class SaleListUpdateSerializer(serializers.Serializer):
     customer_id = serializers.IntegerField(required=False)
     status = serializers.CharField(allow_blank=True)
-    dt = serializers.DateTimeField(allow_null=True)
+    dt = serializers.DateTimeField(allow_null=True) # datetime
     
 class PaymentSerializer(serializers.ModelSerializer):
     customer = CustomUserSerializer()
@@ -294,6 +314,8 @@ class CustomerActionListSerializer(serializers.ModelSerializer):
     
     def get_action(self, obj):
         return obj.c_customer_actions.first().action if obj.c_customer_actions.exists() else ""
+    
+    
 
 class BulkPurchaseSerializer(serializers.Serializer):
     purchaselist = serializers.IntegerField(required=False)
@@ -302,18 +324,19 @@ class BulkPurchaseSerializer(serializers.Serializer):
     status = serializers.CharField()
     currency = serializers.CharField()
     products = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
-    amounts = serializers.ListField(child=serializers.FloatField(), allow_empty=False)  # Float olaraq dəyişdirildi
+    amounts = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
     purchase_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
     cost_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
     prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
     discount_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
+
 
 class BulkSaleSerializer(serializers.Serializer):
     salelist = serializers.IntegerField(required=False)
     customer = serializers.IntegerField()
     products = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
     prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
-    amounts = serializers.ListField(child=serializers.FloatField(), allow_empty=False)  # Float olaraq dəyişdirildi
+    amounts = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
     datetimes = serializers.ListField(child=serializers.DateTimeField(), allow_empty=False)
     statuses = serializers.ListField(child=serializers.CharField(), allow_empty=False)
 

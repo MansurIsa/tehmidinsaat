@@ -19,7 +19,7 @@ class Purchase(models.Model):
     supplier = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="supplier_purchases")
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="purchases")
     purchaselist = models.ForeignKey(PurchaseList, on_delete=models.CASCADE, related_name="purchaselist_purchases", blank=True, null=True)
-    amount = models.FloatField("Miqdar", default=0)  # Float olaraq dəyişdirildi
+    amount = models.IntegerField("Miqdar", default=0)
     price = models.FloatField("Alış qiyməti", default=0)
     date = models.DateField("Alış tarixi", blank=True, null=True)
     status = models.CharField("Status", choices=STATUS, max_length=1, default='G')
@@ -34,7 +34,7 @@ class Purchase(models.Model):
     
 class Stock(models.Model):
     product = models.OneToOneField(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="stock")
-    amount = models.FloatField(default=0)  # Float olaraq dəyişdirildi
+    amount = models.IntegerField(default=0)
 
     class Meta:
         ordering = ("-id",)
@@ -67,7 +67,7 @@ class Sale(models.Model):
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="customer_sales")
     salelist = models.ForeignKey(SaleList, verbose_name="Siyahı", on_delete=models.CASCADE, related_name="salelist_sales", blank=True, null=True)
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_sales")
-    amount = models.FloatField("Miqdar", default=0)  # Float olaraq dəyişdirildi
+    amount = models.IntegerField("Miqdar", default=0)
     datetime = models.DateTimeField("Tarix və vaxt", blank=True, null=True)
     price = models.FloatField("Satış qiyməti", blank=True, null=True)
     status = models.CharField("Status", choices=STATUS, max_length=1, default='G')
@@ -97,10 +97,10 @@ class ProductAction(models.Model):
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_actions")
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="customer_product_actions", blank=True, null=True)
     date = models.DateField("Tarix")
-    incoming_product_number = models.FloatField("Gələn məhsul sayı", blank=True, null=True)  # Float olaraq dəyişdirildi
-    sold_product_number = models.FloatField("Satılan məhsul sayı", blank=True, null=True)  # Float olaraq dəyişdirildi
-    remaining_product_number = models.FloatField("Qalan məhsul sayı", blank=True, null=True)  # Float olaraq dəyişdirildi
-    return_product_number = models.FloatField("Qaytarılan məhsul sayı", blank=True, null=True)  # Float olaraq dəyişdirildi
+    incoming_product_number = models.IntegerField("Gələn məhsul sayı", blank=True, null=True)
+    sold_product_number = models.IntegerField("Satılan məhsul sayı", blank=True, null=True)
+    remaining_product_number = models.IntegerField("Qalan məhsul sayı", blank=True, null=True)
+    return_product_number = models.IntegerField("Qaytarılan məhsul sayı", blank=True, null=True)
 
     action = models.CharField("Hərəkət", max_length=250, default="-")
 
@@ -151,7 +151,7 @@ class ReturnBack(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="returnbacks")
     date = models.DateField()
     reason = models.TextField(blank=True, null=True)
-    amount = models.FloatField()  # Float olaraq dəyişdirildi
+    amount = models.IntegerField()
     status = models.CharField(choices=STATUS, max_length=1, default="I")
 
     class Meta:
@@ -190,3 +190,13 @@ class SupplierPayment(models.Model):
 
     def __str__(self):
         return self.supplier.username
+
+
+
+
+"""
+Product --- Purchase
+CustomUser - one --- Sale - many
+Product - one --- Sale - many
+
+"""

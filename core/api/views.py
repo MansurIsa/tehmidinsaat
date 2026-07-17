@@ -6,33 +6,33 @@ from rest_framework import status, filters
 from rest_framework.pagination import PageNumberPagination
 from core.models import (
     CustomUser, SiteSettings, Banner, ProductCategory,
-    Product, ProductAbout, Application, SocialMedia, Advantage,
+    Brand, Store, Product, ProductAbout, Application, SocialMedia, Advantage,
     Activity, Service, Mission, BasketItem, Article, Order, OrderItem, WantedProduct
 )
 from core.api.serializers import (
     CustomUserCreateSerializer, CustomUserSerializer, CustomUserSerializer, SiteSettingsSerializer, BannerSerializer, ProductCategorySerializer, ProductCreateSerializer,
-    ProductUpdateSerializer, ArticleSerializer, ProductSerializer, ApplicationSerializer, SocialMediaSerializer, AdvantageSerializer,
+    ProductUpdateSerializer, ArticleSerializer, BrandSerializer, StoreSerializer, ProductSerializer, ApplicationSerializer, SocialMediaSerializer, AdvantageSerializer,
     ActivitySerializer, ServiceSerializer, MissionSerializer, BasketItemSerializer, BasketItemCreateSerializer, BasketCleanSerializer,
     OrderCreateSerializer, ProductListSerializer, CustomUserRetrieveSerializer, WantedProductCreateSerializer
 )
 from django.shortcuts import get_object_or_404
 import json
-from django.db.models import F, Subquery, Case, When, IntegerField, Value
+from django.db.models import F, Subquery
 
 class CustomPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+    page_size = 10  # default olaraq hər səhifədə 10 obyekt
+    page_size_query_param = 'page_size'  # istifadəçi ?page_size=20 yaza bilər
+    max_page_size = 100  # maksimum icazə verilən ölçü
 
 class CustomUserPagination(PageNumberPagination):
-    page_size = 5
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+    page_size = 5  # default olaraq hər səhifədə 10 obyekt
+    page_size_query_param = 'page_size'  # istifadəçi ?page_size=20 yaza bilər
+    max_page_size = 100  # maksimum icazə verilən ölçü
 
 class ShortProductCustomPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+    page_size = 10  # default olaraq hər səhifədə 10 obyekt
+    page_size_query_param = 'page_size'  # istifadəçi ?page_size=20 yaza bilər
+    max_page_size = 100  # maksimum icazə verilən ölçü
 
 class UserCreateAPIView(CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -80,18 +80,29 @@ class ProductCategoryListAPIView(ListAPIView):
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
 
+class BrandListAPIView(ListAPIView):
+    queryset = Brand.objects.all()
+    serializer_class = BrandSerializer
+
+class StoreListAPIView(ListAPIView):
+    queryset = Store.objects.all()
+    serializer_class = StoreSerializer
+
+from django.db.models import Case, When, IntegerField, Value
+
 class ShortProductListAPIView(ListAPIView):
     serializer_class = ProductListSerializer
     pagination_class = ShortProductCustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "degree", "category__name", "articles__name"]
+    search_fields = ["name", "degree", "brand__name", "store__name", "category__name", "articles__name"]
 
     def get_queryset(self):
-        return Product.objects.select_related("category").prefetch_related("articles").annotate(
+        # return Product.objects.select_related("brand").prefetch_related("articles").order_by("-updated_at")
+        return Product.objects.select_related("brand").prefetch_related("articles").annotate(
                 stock_status=Case(
-                    When(amount__gt=20, then=Value(1)),
-                    When(amount__gt=0, then=Value(2)),
-                    When(amount=0, then=Value(3)),
+                    When(amount__gt=20, then=Value(1)),   # stock_in
+                    When(amount__gt=0, then=Value(2)),    # stock_out
+                    When(amount=0, then=Value(3)),        # out of stock
                     output_field=IntegerField(),
                 )
             ).order_by("stock_status", "-updated_at")
@@ -101,18 +112,18 @@ class ProductListAPIView(ListAPIView):
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "degree", "category__name", "articles__name"]
+    search_fields = ["name", "degree", "brand__name", "store__name", "category__name", "articles__name"]
 
 class RecentProductListAPIView(ListAPIView):
     serializer_class = ProductListSerializer
     pagination_class = ShortProductCustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "degree", "category__name", "articles__name"]
+    search_fields = ["name", "degree", "brand__name", "store__name", "category__name", "articles__name"]
 
     def get_queryset(self):
         qs = (
             Product.objects
-            .select_related("category")
+            .select_related("brand", "store", "category")
             .prefetch_related("articles").order_by("-updated_at_purchase_time")
             .filter(price__gt=0)
         )
@@ -124,7 +135,7 @@ class CategoryProductListAPIView(ListAPIView):
         category_id = self.kwargs.get("id")
         return Product.objects.filter(
             category__id = category_id
-        ).select_related("category").prefetch_related("articles")
+        ).select_related("brand").prefetch_related("articles")
     serializer_class = ProductListSerializer
     pagination_class = CustomPagination
 
@@ -137,8 +148,9 @@ class ProductCreateAPIView(CreateAPIView):
             "name": request.data.get("name"),
             "degree": request.data.get("degree"),
             "image": request.data.get("image"),
-            "measurement_unit": request.data.get("measurement_unit"),
             "category": request.data.get("category"),
+            "brand": request.data.get("brand"),
+            "store": request.data.get("store"),
         }
 
         articles_data = {
@@ -170,6 +182,8 @@ class ProductCreateAPIView(CreateAPIView):
             response_data = {}
             if articles:
                 for article_name in articles:
+                    # if Article.objects.filter(name=article_name, product=product, product__store=product.store).exists():
+                    #     response_data["errors"] = f"{article_name} artıq mövcuddur."
                     if Article.objects.filter(name=article_name).exclude(product__name=product.name).exists():
                         response_data["errors"] = f"Artikl '{article_name}' artıq mövcuddur."
                     else:
@@ -188,6 +202,10 @@ class ProductCreateAPIView(CreateAPIView):
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# class ProductCreateAPIView(CreateAPIView):
+#     queryset = Product.objects.all()
+#     serializer_class = ProductCreateSerializer
+    
 class ProductRetrieveAPIView(RetrieveAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
@@ -271,14 +289,15 @@ class ProductRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
                     for i in range(len(article_ids)):
                         product_article = Article.objects.get(id=article_ids[i])
                         product_article.name = articles[i]
-                        if Article.objects.filter(name=product_article.name, product__name=product.name).exists():
+                        if Article.objects.filter(name=product_article.name, product__name=product.name, product__store__name=product.store.name).exists():
                             response_data["errors"] = f"Artikl '{product_article.name}' artıq mövcuddur."
                         elif Article.objects.filter(name=product_article.name).exclude(product__name=product.name).exists():
                             response_data["errors"] = f"Artikl '{product_article.name}' artıq mövcuddur."
                         product_article.save()
                 if len(articles) > len(article_ids):
+                    # 0 1 2   0 1 2 3 4 5
                     for i in range(len(article_ids), len(articles)):
-                        if Article.objects.filter(name=articles[i], product__name=product.name).exists():
+                        if Article.objects.filter(name=articles[i], product__name=product.name, product__store__name=product.store.name).exists():
                             response_data["errors"] = f"Artikl '{articles[i]}' artıq mövcuddur."
                         elif Article.objects.filter(name=articles[i]).exclude(product__name=product.name).exists():
                             response_data["errors"] = f"Artikl '{articles[i]}' artıq mövcuddur."
@@ -357,6 +376,7 @@ class BasketItemCreateAPIView(CreateAPIView):
         product = serializer.validated_data['product']
         quantity = serializer.validated_data.get('quantity', 1)
 
+        # Try to get existing BasketItem
         basket_item, created = BasketItem.objects.get_or_create(
             user=user,
             product=product,
@@ -375,6 +395,7 @@ class BasketItemCreateAPIView(CreateAPIView):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
 
+        # Return the updated BasketItem
         updated_serializer = self.get_serializer(self.instance)
         return Response(updated_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -438,7 +459,7 @@ class OrderCreateAPIView(CreateAPIView):
                 OrderItem.objects.create(
                     order = order,
                     product = product,
-                    quantity = float(quantities[i])  # float olaraq çevrildi
+                    quantity = quantities[i]
                 )
             BasketItem.objects.filter(product_id__in=products).delete()
             response_data = {

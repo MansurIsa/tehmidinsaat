@@ -63,29 +63,46 @@ class ProductCategory(models.Model):
     def __str__(self):
         return self.name
     
-# Brand ve Store modelleri SILINIR
+class Brand(models.Model):
+    name = models.CharField("Ad", max_length=100)
+    
+    class Meta:
+        verbose_name = "marka"
+        verbose_name_plural = "Markalar"
+        ordering = ("-id",)
 
+    def __str__(self):
+        return self.name
+    
+class Store(models.Model):
+    name = models.CharField("Ad", max_length=100)
+    
+    class Meta:
+        verbose_name = "brend"
+        verbose_name_plural = "Brendlər"
+        ordering = ("-id",)
+
+    def __str__(self):
+        return self.name
+    
 class Product(models.Model):
     CURRENCIES = (
         ('M', 'Manat'),
         ('D', 'Dollar'),
         ('R', 'Rubl')
     )
-    MEASUREMENT_UNITS = (
-        ('piece', 'Ədəd'),
-        ('kg', 'Kiloqram')
-    )
     name = models.CharField("Ad", max_length=256)
     image = models.ImageField("Şəkil", upload_to="product_imgs/", blank=True, null=True)
     degree = models.CharField("Dərəcə", max_length=50, blank=True, null=True)
-    measurement_unit = models.CharField("Ölçü vahidi", max_length=10, choices=MEASUREMENT_UNITS, default='piece')
     cost_price = models.FloatField("Maya dəyəri", default=0)
     purchase_price = models.FloatField("Alış qiyməti", default=0)
     currency = models.CharField("Valyuta", max_length=1, default='M')
     price = models.FloatField("Satış qiyməti", default=0)
     discount_price = models.FloatField("Endirimli qiyməti", blank=True, null=True)
     category = models.ForeignKey(ProductCategory, verbose_name="Kateqoriya", on_delete=models.SET_NULL, related_name="category_products", blank=True, null=True)
-    amount = models.FloatField("Miqdar", default=0)  # Float olaraq dəyişdirildi (kq üçün)
+    brand = models.ForeignKey(Brand, verbose_name="Marka", on_delete=models.SET_NULL, related_name="brand_products", blank=True, null=True)
+    store = models.ForeignKey(Store, verbose_name="Brend", on_delete=models.SET_NULL, related_name="store_products", blank=True, null=True)
+    amount = models.IntegerField("Miqdar", default=0)
     updated_at = models.DateTimeField(auto_now=True)
     updated_at_purchase_time = models.DateTimeField("Alış yenilənmə tarixi", default=timezone.now)
 
@@ -93,6 +110,9 @@ class Product(models.Model):
         verbose_name = "məhsul"
         verbose_name_plural = "Məhsullar"
         ordering = ("-id",)
+        # constraints = [
+        #     models.UniqueConstraint(fields=['name', 'store'], name='unique_product_per_brand')
+        # ]
 
     @property
     def full_name(self):
@@ -126,6 +146,11 @@ class Article(models.Model):
 
     def __str__(self):
         return self.name
+    
+    # def save(self, *args, **kwargs):
+    #     if Article.objects.filter(name=self.name) and (not Product.objects.filter(name=self.product.name).exclude(id=self.product.id).exists() or Product.objects.filter(name=self.product.name, store=self.product.store).exclude(id=self.product.id).exists()):
+    #         return None
+    #     return super(Article, self).save(*args, **kwargs)
 
 class Application(models.Model):
     name = models.CharField("Ad", max_length=50)
@@ -209,7 +234,7 @@ class Mission(models.Model):
 class BasketItem(models.Model):
     user = models.ForeignKey(CustomUser, verbose_name="İstifadəçi", on_delete=models.CASCADE, related_name="user_basketitems")
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_basketitems")
-    quantity = models.FloatField("Miqdar", default=1)  # Float olaraq dəyişdirildi
+    quantity = models.IntegerField("Miqdar", default=1)
 
     class Meta:
         verbose_name = "səbət elementi"
@@ -230,13 +255,14 @@ class Order(models.Model):
         verbose_name_plural = "Sifarişlər"
         ordering = ("-id",)
 
+
     def __str__(self):
         return self.user.username
     
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="order_orderitems")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="product_orderitems")
-    quantity = models.FloatField(default=1)  # Float olaraq dəyişdirildi
+    quantity = models.IntegerField(default=1)
 
     class Meta:
         verbose_name = "sifariş elementi"
@@ -259,3 +285,6 @@ class WantedProduct(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+    

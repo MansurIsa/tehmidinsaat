@@ -21,10 +21,11 @@ from django.utils import timezone
 from decimal import Decimal
 
 from rest_framework.filters import BaseFilterBackend
-from django.db.models import Max, Value, CharField, Case, When, F, Sum, Q, FloatField, Subquery, OuterRef, Prefetch
-from django.db.models.functions import Concat, Coalesce
 
 class TotalDebtFilterBackend(BaseFilterBackend):
+    """
+    Filter queryset by min_total_debt and max_total_debt query params.
+    """
     def filter_queryset(self, request, queryset, view):
         min_amount = request.query_params.get('min_total_amount')
         max_amount = request.query_params.get('max_total_amount')
@@ -32,11 +33,13 @@ class TotalDebtFilterBackend(BaseFilterBackend):
         if not min_amount and not max_amount:
             return queryset
 
+        # convert to float
         if min_amount:
             min_amount = float(min_amount)
         if max_amount:
             max_amount = float(max_amount)
 
+        # filter manually because total_debt is Python property
         filtered = []
         for sale in queryset:
             amount = sale.total_amount
@@ -49,6 +52,9 @@ class TotalDebtFilterBackend(BaseFilterBackend):
         return filtered
     
 class PurchaseDateFilterBackend(BaseFilterBackend):
+    """
+    Filter queryset by min_total_debt and max_total_debt query params.
+    """
     def filter_queryset(self, request, queryset, view):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
@@ -56,6 +62,7 @@ class PurchaseDateFilterBackend(BaseFilterBackend):
         if not start_date and not end_date:
             return queryset
 
+        # convert to float
         if start_date:
             st_dt = start_date.split("-")
             start_date = datetime.date(int(st_dt[0]), int(st_dt[1]), int(st_dt[2]))
@@ -63,6 +70,7 @@ class PurchaseDateFilterBackend(BaseFilterBackend):
             e_dt = end_date.split("-")
             end_date = datetime.date(int(e_dt[0]), int(e_dt[1]), int(e_dt[2]))
 
+        # filter manually because total_debt is Python property
         filtered = []
         for purchaselist in queryset:
             if not purchaselist.purchaselist_purchases.exists():
@@ -77,6 +85,9 @@ class PurchaseDateFilterBackend(BaseFilterBackend):
         return filtered
     
 class SaleDateFilterBackend(BaseFilterBackend):
+    """
+    Filter queryset by min_total_debt and max_total_debt query params.
+    """
     def filter_queryset(self, request, queryset, view):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
@@ -84,6 +95,7 @@ class SaleDateFilterBackend(BaseFilterBackend):
         if not start_date and not end_date:
             return queryset
 
+        # convert to float
         if start_date:
             st_dt = start_date.split("-")
             start_date = datetime.date(int(st_dt[0]), int(st_dt[1]), int(st_dt[2]))
@@ -91,6 +103,7 @@ class SaleDateFilterBackend(BaseFilterBackend):
             e_dt = end_date.split("-")
             end_date = datetime.date(int(e_dt[0]), int(e_dt[1]), int(e_dt[2]))
 
+        # filter manually because total_debt is Python property
         filtered = []
         for salelist in queryset:
             if not salelist.salelist_sales.exists():
@@ -105,9 +118,9 @@ class SaleDateFilterBackend(BaseFilterBackend):
         return filtered
 
 class CustomPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+    page_size = 10  # default olaraq hər səhifədə 10 obyekt
+    page_size_query_param = 'page_size'  # istifadəçi ?page_size=20 yaza bilər
+    max_page_size = 100  # maksimum icazə verilən ölçü
 
 class PurchaseCreateAPIView(CreateAPIView):
     queryset = Purchase.objects.all()
@@ -139,6 +152,7 @@ class PurchaseCreateAPIView(CreateAPIView):
             product.price = product_data["price"]
             product.discount_price = product_data["discount_price"]
             product.currency = product_data["currency"] if product_data["currency"] else product.currency
+            # product.amount = product.amount + int(purchase_data["amount"])
             product.save()
 
             stock_status = serializer.data.get("status")
@@ -146,12 +160,20 @@ class PurchaseCreateAPIView(CreateAPIView):
                 stock, created = Stock.objects.get_or_create(
                     product = product
                 )
-                product.amount = product.amount + float(purchase_data["amount"])
-                stock.amount = stock.amount + float(purchase_data["amount"])
+                product.amount = product.amount + int(purchase_data["amount"])
+                stock.amount = stock.amount + int(purchase_data["amount"])
                 stock.save()
 
+                # dt_data = purchase_data["date"].split("-")
+                # ProductAction.objects.create(
+                #     product = product,
+                #     date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))),
+                #     incoming_product_number = int(purchase_data["amount"]),
+                #     remaining_product_number = stock.amount
+                # )
+
             response_data = {
-                "message": f"{float(purchase_data['amount'])} Məhsul alındı: {product.name}"
+                "message": f"{int(purchase_data['amount'])} Məhsul alındı: {product.name}"
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -170,6 +192,8 @@ class PurchaseRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
             serializer.save()
             instance.product.purchase_price = instance.price
             instance.product.save()
+            # instance.product.amount = instance.product.amount - previous_instance_amount + instance.amount
+            # instance.product.save()
             customeractionlist = CustomerActionList.objects.create()
 
             if previous_instance_status == "G" and instance.status == "A":
@@ -239,6 +263,20 @@ class PurchaseRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
                 
             instance.product.amount = instance.product.stock.amount
             instance.product.save()
+            # pr_serializer = ProductUpdateSerializer(instance.product, data=product_data, partial=True)
+            # print(type(instance.product))
+            # print(pr_serializer.is_valid())
+            # if pr_serializer.is_valid():
+            #     print(pr_serializer.data)
+            #     pr_serializer.save()
+            # else:
+            #     return Response(pr_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # productaction = instance.product_actions.all()
+            # productaction.product = instance.product
+            # productaction.date = instance.datetime.date()
+            # productaction.incoming_product_number = instance.amount
+            # productaction.save()
+
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -290,8 +328,9 @@ class PurchaseListAPIView(ListAPIView):
     serializer_class = PurchaseSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["product__name", "product__degree", "product__articles__name", "product__category__name"]
+    search_fields = ["product__name", "product__degree", "product__articles__name", "product__brand__name", "product__store__name", "product__category__name"]
 
+from django.db.models import Max
 class PurchaseListListAPIView(ListAPIView):
     def get_queryset(self):
         return PurchaseList.objects.annotate(
@@ -344,6 +383,10 @@ class PurchaseListUpdateAPIView(UpdateAPIView):
                             purchase.product.stock.delete()
                             purchase.product.amount = 0
                             purchase.product.save()
+
+                        # if customeractionlist.id is not None:
+
+                        #     customeractionlist.delete() 
 
                         ProductAction.objects.create(
                             product = purchase.product,
@@ -475,6 +518,9 @@ class BulkPurchaseAPIView(APIView):
                         supplier = supplier,
                         product = product,
                         purchaselist = purchaselist
+                        # amount = amounts[i],
+                        # date = date,
+                        # status = p_status,
                     )
                     if created:
                         purchase.amount = amounts[i]
@@ -487,6 +533,7 @@ class BulkPurchaseAPIView(APIView):
                         product.price = prices[i]
                         product.discount_price = discount_prices[i]
                         product.currency = currency
+                        # product.amount = product.amount + amounts[i]
                         product.updated_at_purchase_time = timezone.now()
                         product.save()
 
@@ -529,6 +576,7 @@ class BulkPurchaseAPIView(APIView):
                         product.price = prices[i]
                         product.discount_price = discount_prices[i]
                         product.currency = currency
+                        # product.amount = product.amount + amounts[i]
                         product.updated_at_purchase_time = timezone.now()
                         product.save()
 
@@ -579,6 +627,7 @@ class BulkPurchaseAPIView(APIView):
                     product.price = prices[i]
                     product.discount_price = discount_prices[i]
                     product.currency = currency
+                    # product.amount = product.amount + amounts[i]
                     product.updated_at_purchase_time = timezone.now()
                     product.save()
 
@@ -622,7 +671,7 @@ class StockListAPIView(ListAPIView):
     serializer_class = StockSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["product__name", "product__articles__name"]
+    search_fields = ["product__name", "product__articles__name", "product__brand__name"]
 
 class AddToStockAPIView(APIView):
     def post(self, request):
@@ -673,12 +722,22 @@ class StockRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
     serializer_class = StockUpdateSerializer
     lookup_field = "id"
 
+# class ShortSaleListAPIView(ListAPIView):
+#     queryset = Sale.objects.all()
+#     serializer_class = ShortSaleSerializer
+#     pagination_class = CustomPagination
+#     filter_backends = [filters.SearchFilter]
+#     search_fields = ["customer__username", "customer__first_name", "customer__last_name", "product__name", "product__store__name"]
+
+from django.db.models import Value, CharField, Case, When, F
+from django.db.models.functions import Concat
+
 class ShortSaleListAPIView(ListAPIView):
     serializer_class = ShortSaleSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
 
-    search_fields = ["sale_text"]
+    search_fields = ["sale_text"]   # <- annotate olunan field
 
     def get_queryset(self):
         full_name = Concat(
@@ -699,12 +758,14 @@ class ShortSaleListAPIView(ListAPIView):
 
         return (
             Sale.objects
-            .select_related("customer", "product")
+            .select_related("customer", "product", "product__store")
             .annotate(
                 sale_text=Concat(
                     customer_name,
                     Value(" - "),
                     F("product__name"),
+                    Value(" - "),
+                    F("product__store__name"),
                     Value(" ("),
                     F("datetime"),
                     Value(")"),
@@ -765,6 +826,9 @@ class SaleListUpdateAPIView(UpdateAPIView):
                         stock.amount = stock.amount + sale.amount
                         stock.save()
                         sale.product.amount = stock.amount
+
+                        # if customeractionlist.id is None:
+                        #     customeractionlist.delete()
 
                         ProductAction.objects.create(
                             product = sale.product,
@@ -869,8 +933,10 @@ class SaleCreateAPIView(CreateAPIView):
        if serializer.is_valid():
             serializer.save()
             product = Product.objects.get(id=sale_data["product"])
+            # product.amount = product.amount - int(sale_data["amount"])
+            # product.save()
             if hasattr(product, "stock"):
-                product.stock.amount = product.stock.amount - float(sale_data["amount"])
+                product.stock.amount = product.stock.amount - int(sale_data["amount"])
                 product.stock.save()
                 product.amount = product.stock.amount
                 product.save()
@@ -881,6 +947,7 @@ class SaleCreateAPIView(CreateAPIView):
                product = product,
                customer = customer,
                date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))),
+            #    incoming_product_number = product.amount,
                sold_product_number = sale_data["amount"],
                remaining_product_number = product.amount     
             )
@@ -888,7 +955,7 @@ class SaleCreateAPIView(CreateAPIView):
                 customer = customer,
                 product = product,
                 date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))), 
-                product_price = float(sale_data["price"]) * float(sale_data["amount"])
+                product_price = int(sale_data["price"]) * int(sale_data["amount"])
             )
             response_data = {"message": "Satış edildi."}
             return Response(response_data, status=status.HTTP_201_CREATED)
@@ -1027,6 +1094,8 @@ class BulkSaleAPIView(APIView):
                         customer = customer,
                         salelist = salelist,
                         product = product, 
+                        # datetime = datetimes[i],
+                        # price = prices[i],
                     )
                     if created:
                         sale.seller = request.user
@@ -1211,6 +1280,7 @@ class PaymentCreateAPIView(CreateAPIView):
         if serializer.is_valid():
             serializer.save()
             customer = CustomUser.objects.get(id=payment_data["customer"])
+            # customer_debt = sum([sale.price * sale.amount for sale in customer.customer_sales.all()])
             previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
             previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
             previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
@@ -1364,8 +1434,13 @@ class CustomerActionListAPIView(APIView):
         customeractionlists = CustomerActionList.objects.filter(
             c_customer_actions__in=customer.customer_actions.all()
         ).distinct()
+        # customeractions = CustomerAction.objects.filter(
+        #     customer = customer,
+        #     customeractionlist = None
+        # )
 
         cl_data = CustomerActionListSerializer(customeractionlists, many=True).data
+        # c_data = CustomerActionSerializer(customeractions, many=True).data
 
         response_data = cl_data
 
@@ -1394,9 +1469,9 @@ class ReturnBackCreateAPIView(CreateAPIView):
         if serializer.is_valid():
             instance = serializer.save()
             amount = request.data.get("amount")
-            rb_status = instance.status
+            rb_status = instance.status # returnback status
             sale = instance.sale
-            sale_amount = sale.amount - float(amount)
+            sale_amount = sale.amount - int(amount)
             sale.amount = sale_amount
             sale.save()
             if rb_status == "I":
@@ -1640,27 +1715,52 @@ class SaleDynamicsAPIView(APIView):
             if user.is_superuser:
                 for i in range(len(months)):
                     year = datetime.datetime.now().year
-                    sales = Sale.objects.filter(
-                        datetime__date__month = i + 1,
-                        datetime__date__year = year,
-                        status = "S"
-                    )
+                    if brand_id:
+                        sales = Sale.objects.filter(
+                            product__brand__id = brand_id,
+                            datetime__date__month = i + 1,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
+                    else:
+                        sales = Sale.objects.filter(
+                            datetime__date__month = i + 1,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             elif user.is_staff:
                 for i in range(len(months)):
                     year = datetime.datetime.now().year
-                    sales = Sale.objects.filter(
-                        seller = user,
-                        datetime__date__month = i + 1,
-                        datetime__date__year = year,
-                        status = "S"
-                    )
+                    if brand_id:
+                        sales = Sale.objects.filter(
+                            seller = user,
+                            product__brand__id = brand_id,
+                            datetime__date__month = i + 1,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
+                    else:
+                        sales = Sale.objects.filter(
+                            seller = user,
+                            datetime__date__month = i + 1,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             else:
                 for i in range(len(months)):
                     year = datetime.datetime.now().year
+                    # if brand_id:
+                    #     sales = Sale.objects.filter(
+                    #         seller = user,
+                    #         product__brand__id = brand_id,
+                    #         datetime__date__month = i + 1,
+                    #         datetime__date__year = year,
+                    #         status = "S"
+                    #     )
                     sales = Sale.objects.filter(
                         customer = user,
                         datetime__date__month = i + 1,
@@ -1680,10 +1780,17 @@ class SaleDynamicsAPIView(APIView):
                 all_sale_years.sort()
                 total_sale_amounts = []
                 for year in all_sale_years:
-                    sales = Sale.objects.filter(
-                        datetime__date__year = year,
-                        status = "S"
-                    )
+                    if brand_id:
+                        sales = Sale.objects.filter(
+                            product__brand__id = brand_id,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
+                    else:
+                        sales = Sale.objects.filter(
+                            datetime__date__year = year,
+                            status = "S"
+                        )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             else:
@@ -1692,11 +1799,19 @@ class SaleDynamicsAPIView(APIView):
                 all_sale_years.sort()
                 total_sale_amounts = []
                 for year in all_sale_years:
-                    sales = Sale.objects.filter(
-                        seller = user,
-                        datetime__date__year = year,
-                        status = "S"
-                    )
+                    if brand_id:
+                        sales = Sale.objects.filter(
+                            seller = user,
+                            product__brand__id = brand_id,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
+                    else:
+                        sales = Sale.objects.filter(
+                            seller = user,
+                            datetime__date__year = year,
+                            status = "S"
+                        )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             response_data = {
@@ -1708,16 +1823,72 @@ class SaleDynamicsAPIView(APIView):
                 "errors": "Göndərilən məlumat doğru deyil."
             }
             return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
+        
+# class MostInDebtedCustomerAPIView(APIView):
+#     def get(self, request):
+#         customers = CustomUser.objects.all()
+#         customer_debts = []
+#         for customer in customers:
+#             customer_debt = sum([sale.price * sale.amount for sale in customer.customer_sales.all()]) - sum([payment.amount for payment in customer.payments.all()])
+#             customer_debts.append(customer_debt)
+        
+#         indebted_customers = list(zip(customers, customer_debts))
+#         indebted_customers.sort(reverse=True, key=lambda x: x[1])
+#         most_indebted_customers = indebted_customers[:5]
+#         customers_data = []
+#         for customer in most_indebted_customers:
+#             customer_data = {
+#                 "name": customer[0].username,
+#                 "debt": customer[1],
+#                 "phone_number": customer[0].phone_number
+#             }
+#             customers_data.append(customer_data)
+#         response_data = {"most_indebted_customers": customers_data}
+#         return Response(response_data, status=status.HTTP_200_OK)
+
+from django.db.models import Sum, F, Q, Value, FloatField, Subquery, OuterRef, Prefetch
+from django.db.models.functions import Coalesce
 
 class MostInDebtedCustomerAPIView(APIView):
     def get(self, request):
+        # Annotate ilə borc hesablayırıq
+        # customers = (
+        #     CustomUser.objects
+        #     .annotate(
+        #         total_sales=Coalesce(Sum(F("customer_sales__price") * F("customer_sales__amount"), filter=Q(customer_sales__status="S"), output_field=FloatField()), Value(0.0)),
+        #         total_payments=Coalesce(Sum("payments__amount", output_field=FloatField()), Value(0.0))
+        #     )
+        #     .annotate(debt=F("total_sales") - F("total_payments"))
+        #     .filter(debt__gt=0)
+        #     .order_by("-debt")
+        # )
+        
+        # # Pagination tətbiq edirik
+        # paginator = CustomPagination()
+        # paginated_customers = paginator.paginate_queryset(customers, request)
+
+        # # Data serialize edirik
+        # customers_data = [
+        #     {
+        #         "name": customer.username,
+        #         "debt": customer.debt if customer.debt else 0,
+        #         "phone_number": customer.phone_number,
+        #     }
+        #     for customer in paginated_customers
+        # ]
+
+        # return paginator.get_paginated_response(customers_data)
+
+
         customers = CustomUser.objects.prefetch_related(
             "customer_sales",
             "payments"
         )
 
+        # Python səviyyəsində borc hesablayırıq
         customers_with_debt = []
         for customer in customers:
+            # Statusu "S" olan satışları götürürük
             total_sales = sum(
                 s.price * s.amount for s in customer.customer_sales.all() if s.status == "S"
             )
@@ -1735,8 +1906,10 @@ class MostInDebtedCustomerAPIView(APIView):
                     "phone_number": customer.phone_number,
                 })
 
+        # Borca görə azalan sıraya düzürük
         customers_with_debt.sort(key=lambda x: x["debt"], reverse=True)
 
+        # Pagination tətbiq edirik
         paginator = CustomPagination()
         paginated_customers = paginator.paginate_queryset(customers_with_debt, request)
 
@@ -1748,7 +1921,7 @@ class StockOutProductsListAPIView(ListAPIView):
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "articles__name", "category__name"]
+    search_fields = ["name", "articles__name", "brand__name", "store__name", "category__name"]
 
 class SupplierPaymentListAPIView(ListAPIView):
     queryset = SupplierPayment.objects.all()
@@ -1772,6 +1945,7 @@ class SupplierPaymentCreateAPIView(CreateAPIView):
         if serializer.is_valid():
             serializer.save()
             customer = CustomUser.objects.get(id=payment_data["supplier"])
+            # customer_debt = sum([sale.price * sale.amount for sale in customer.customer_sales.all()])
             c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
             c_sales = Sale.objects.filter(customer=customer, status="S")
             c_payments = Payment.objects.filter(customer=customer)

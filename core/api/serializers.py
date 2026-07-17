@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from core.models import (
     CustomUser, SiteSettings, Banner, ProductCategory,
-    Product, ProductAbout, Application, SocialMedia, Advantage,
+    Brand, Store, Product, ProductAbout, Application, SocialMedia, Advantage,
     Activity, Service, Mission, BasketItem, Article, Order, OrderItem, WantedProduct
 )
 from accounting.models import ReturnBack
@@ -38,6 +38,10 @@ class CustomUserSerializer(serializers.ModelSerializer):
         exclude = ("password", "groups", "user_permissions")
     
 class CustomUserRetrieveSerializer(serializers.ModelSerializer):
+    # total_amount = serializers.SerializerMethodField()
+    # total_supplier_amount = serializers.SerializerMethodField()
+    # total_paid_amount = serializers.SerializerMethodField()
+    # total_supplier_paid_amount = serializers.SerializerMethodField()
     customer_debt_amount = serializers.SerializerMethodField()
     our_debt_amount = serializers.SerializerMethodField()
 
@@ -107,6 +111,16 @@ class ProductCategorySerializer(serializers.ModelSerializer):
         model = ProductCategory
         fields = "__all__"
 
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = "__all__"
+
+class StoreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Store
+        fields = "__all__"
+
 class ArticleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
@@ -125,18 +139,19 @@ class ProductAboutSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class ProductListSerializer(serializers.ModelSerializer):
+    brand_name = serializers.CharField(source="brand.name", read_only=True)
     article_names = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name", source="articles")
-    measurement_unit_display = serializers.CharField(source="get_measurement_unit_display", read_only=True)
     
     class Meta:
         model = Product
-        fields = ('id', 'name', "degree", 'image', 'article_names', 'measurement_unit', 'measurement_unit_display', 'price', 'discount_price', 'amount')
+        fields = ('id', 'name', "degree", 'image', 'brand_name', 'article_names', 'price', 'discount_price', 'amount')
 
 class ProductSerializer(serializers.ModelSerializer):
     category = ProductCategorySerializer()
+    brand = BrandSerializer()
+    store = StoreSerializer()
     articles = ArticleSerializer(many=True)
     product_abouts = ProductAboutSerializer(many=True)
-    measurement_unit_display = serializers.CharField(source="get_measurement_unit_display", read_only=True)
 
     class Meta:
         model = Product
@@ -145,7 +160,7 @@ class ProductSerializer(serializers.ModelSerializer):
 class ProductCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ("name", "degree", "image", "measurement_unit", "category")
+        fields = ("name", "degree", "image", "category", "brand", "store")
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -215,3 +230,97 @@ class WantedProductCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WantedProduct
         fields = "__all__"
+
+# from django.db import transaction
+# import json
+
+# def normalize_list(value):
+#     if isinstance(value, str):
+#         try:
+#             return json.loads(value.replace("'", '"'))
+#         except Exception:
+#             return []
+#     return value
+
+# class ProductCreateSerializer(serializers.ModelSerializer):
+#     article_names = serializers.ListField(
+#         child=serializers.CharField(),
+#         write_only=True,
+#         required=False
+#     )
+#     titles = serializers.ListField(
+#         child=serializers.CharField(),
+#         write_only=True,
+#         required=False
+#     )
+#     contents = serializers.ListField(
+#         child=serializers.CharField(),
+#         write_only=True,
+#         required=False
+#     )
+
+#     class Meta:
+#         model = Product
+#         fields = (
+#             "name", "degree", "image",
+#             "category", "brand", "store",
+#             "article_names",
+#             "titles",
+#             "contents",
+#         )
+
+#     def to_internal_value(self, data):
+#         data = data.copy()  # 🔥 QueryDict fix
+
+#         def parse_list(value):
+#             if isinstance(value, str):
+#                 try:
+#                     return json.loads(value)
+#                 except Exception:
+#                     return []
+#             return value
+
+#         for field in ("article_names", "titles", "contents"):
+#             if field in data:
+#                 data[field] = parse_list(data[field])
+
+#         return super().to_internal_value(data)
+    
+#     def validate(self, attrs):
+#         store = attrs.get("store")
+#         article_names = attrs.get("article_names", [])
+
+#         for name in article_names:
+#             if Article.objects.filter(
+#                 name=name,
+#                 product__store=store
+#             ).exists():
+#                 raise serializers.ValidationError(
+#                     f"Artikl '{name}' artıq mövcuddur."
+#                 )
+#         return attrs
+    
+#     def create(self, validated_data):
+#         article_names = validated_data.pop("article_names", [])
+#         titles = validated_data.pop("titles", [])
+#         contents = validated_data.pop("contents", [])
+
+#         with transaction.atomic():
+#             product = Product.objects.create(**validated_data)
+
+#             Article.objects.bulk_create([
+#                 Article(name=name, product=product)
+#                 for name in article_names
+#             ])
+
+#             ProductAbout.objects.bulk_create([
+#                 ProductAbout(
+#                     product=product,
+#                     title=titles[i],
+#                     content=contents[i]
+#                 )
+#                 for i in range(min(len(titles), len(contents)))
+#             ])
+
+#         return product
+
