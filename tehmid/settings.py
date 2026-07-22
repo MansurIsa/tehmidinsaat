@@ -18,6 +18,7 @@ ALLOWED_HOSTS = [
     "tehmidinsaat.com",
     "www.tehmidinsaat.com",
     "admin.tehmidinsaat.com",
+    
 ]
 
 INSTALLED_APPS = [

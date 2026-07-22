@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from tinymce.models import HTMLField
 from django.utils import timezone
+from decimal import Decimal
+from django.core.exceptions import ValidationError
+from decimal import Decimal, ROUND_DOWN
 
 class CustomUser(AbstractUser):
     PAYMENT_STATUS = (
@@ -63,27 +66,27 @@ class ProductCategory(models.Model):
     def __str__(self):
         return self.name
     
-class Brand(models.Model):
-    name = models.CharField("Ad", max_length=100)
+# class Brand(models.Model):
+#     name = models.CharField("Ad", max_length=100)
     
-    class Meta:
-        verbose_name = "marka"
-        verbose_name_plural = "Markalar"
-        ordering = ("-id",)
+#     class Meta:
+#         verbose_name = "marka"
+#         verbose_name_plural = "Markalar"
+#         ordering = ("-id",)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
     
-class Store(models.Model):
-    name = models.CharField("Ad", max_length=100)
+# class Store(models.Model):
+#     name = models.CharField("Ad", max_length=100)
     
-    class Meta:
-        verbose_name = "brend"
-        verbose_name_plural = "Brendlər"
-        ordering = ("-id",)
+#     class Meta:
+#         verbose_name = "brend"
+#         verbose_name_plural = "Brendlər"
+#         ordering = ("-id",)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
     
 class Product(models.Model):
     CURRENCIES = (
@@ -91,18 +94,34 @@ class Product(models.Model):
         ('D', 'Dollar'),
         ('R', 'Rubl')
     )
+    UNITS = (
+        ('piece', 'Ədəd'),
+        ('kg', 'Kq'),
+        ('metre', 'Metr'),
+    )
     name = models.CharField("Ad", max_length=256)
     image = models.ImageField("Şəkil", upload_to="product_imgs/", blank=True, null=True)
-    degree = models.CharField("Dərəcə", max_length=50, blank=True, null=True)
-    cost_price = models.FloatField("Maya dəyəri", default=0)
-    purchase_price = models.FloatField("Alış qiyməti", default=0)
+    # degree = models.CharField("Dərəcə", max_length=50, blank=True, null=True)
+    cost_price = models.DecimalField("Maya dəyəri", max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    purchase_price = models.DecimalField("Alış qiyməti", max_digits=10, decimal_places=2, default=Decimal("0.00"))
     currency = models.CharField("Valyuta", max_length=1, default='M')
-    price = models.FloatField("Satış qiyməti", default=0)
-    discount_price = models.FloatField("Endirimli qiyməti", blank=True, null=True)
+    price = models.DecimalField("Satış qiyməti", max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    discount_price = models.DecimalField("Endirimli qiyməti", max_digits=10, decimal_places=2, blank=True, null=True)
     category = models.ForeignKey(ProductCategory, verbose_name="Kateqoriya", on_delete=models.SET_NULL, related_name="category_products", blank=True, null=True)
-    brand = models.ForeignKey(Brand, verbose_name="Marka", on_delete=models.SET_NULL, related_name="brand_products", blank=True, null=True)
-    store = models.ForeignKey(Store, verbose_name="Brend", on_delete=models.SET_NULL, related_name="store_products", blank=True, null=True)
-    amount = models.IntegerField("Miqdar", default=0)
+    # brand = models.ForeignKey(Brand, verbose_name="Marka", on_delete=models.SET_NULL, related_name="brand_products", blank=True, null=True)
+    # store = models.ForeignKey(Store, verbose_name="Brend", on_delete=models.SET_NULL, related_name="store_products", blank=True, null=True)
+    unit = models.CharField(
+        "Ölçü vahidi", max_length=10, choices=UNITS, default="piece"
+    )
+    # amount = models.DecimalField(
+    #     "Miqdar",
+    #     max_digits=10,
+    #     decimal_places=2,
+    #     default=Decimal("0.00")
+    # )
+    amount = models.DecimalField(
+        "Miqdar", max_digits=10, decimal_places=2, default=Decimal("0.00")
+    )
     updated_at = models.DateTimeField(auto_now=True)
     updated_at_purchase_time = models.DateTimeField("Alış yenilənmə tarixi", default=timezone.now)
 
@@ -116,8 +135,13 @@ class Product(models.Model):
 
     @property
     def full_name(self):
-        return self.name + " " + self.degree
-
+        return self.name 
+    
+    def clean(self):
+        if self.unit == "piece" and self.amount != self.amount.to_integral_value():
+            raise ValidationError({
+                "amount": "Ədəd üçün miqdar tam ədəd olmalıdır."
+            })
     def __str__(self):
         return self.name
     
@@ -234,7 +258,7 @@ class Mission(models.Model):
 class BasketItem(models.Model):
     user = models.ForeignKey(CustomUser, verbose_name="İstifadəçi", on_delete=models.CASCADE, related_name="user_basketitems")
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_basketitems")
-    quantity = models.IntegerField("Miqdar", default=1)
+    quantity = models.DecimalField("Miqdar", max_digits=10, decimal_places=2, default=Decimal("1.00"))
 
     class Meta:
         verbose_name = "səbət elementi"
@@ -246,7 +270,7 @@ class BasketItem(models.Model):
 
 class Order(models.Model):
     user = models.ForeignKey(CustomUser, verbose_name="İstifadəçi", on_delete=models.CASCADE, related_name="orders")
-    amount = models.FloatField("Ümumi məbləğ")
+    amount = models.DecimalField("Ümumi məbləğ", max_digits=10, decimal_places=2)
     date = models.DateField(auto_now_add=True)
     add_to_sale = models.BooleanField("Satışa əlavə et", default=False)
 
@@ -262,7 +286,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="order_orderitems")
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="product_orderitems")
-    quantity = models.IntegerField(default=1)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1.00"))
 
     class Meta:
         verbose_name = "sifariş elementi"

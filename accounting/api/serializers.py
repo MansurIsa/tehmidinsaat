@@ -324,19 +324,19 @@ class BulkPurchaseSerializer(serializers.Serializer):
     status = serializers.CharField()
     currency = serializers.CharField()
     products = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
-    amounts = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
-    purchase_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
-    cost_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
-    prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
-    discount_prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
+    amounts = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
+    purchase_prices = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
+    cost_prices = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
+    prices = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
+    discount_prices = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
 
 
 class BulkSaleSerializer(serializers.Serializer):
     salelist = serializers.IntegerField(required=False)
     customer = serializers.IntegerField()
     products = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
-    prices = serializers.ListField(child=serializers.FloatField(), allow_empty=False)
-    amounts = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+    prices = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
+    amounts = serializers.ListField(child=serializers.DecimalField(max_digits=10, decimal_places=2), allow_empty=False)
     datetimes = serializers.ListField(child=serializers.DateTimeField(), allow_empty=False)
     statuses = serializers.ListField(child=serializers.CharField(), allow_empty=False)
 

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from core.models import Product, CustomUser
 
@@ -19,8 +21,8 @@ class Purchase(models.Model):
     supplier = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="supplier_purchases")
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="purchases")
     purchaselist = models.ForeignKey(PurchaseList, on_delete=models.CASCADE, related_name="purchaselist_purchases", blank=True, null=True)
-    amount = models.IntegerField("Miqdar", default=0)
-    price = models.FloatField("Alış qiyməti", default=0)
+    amount = models.DecimalField("Miqdar", max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    price = models.DecimalField("Alış qiyməti", max_digits=10, decimal_places=2, default=Decimal("0.00"))
     date = models.DateField("Alış tarixi", blank=True, null=True)
     status = models.CharField("Status", choices=STATUS, max_length=1, default='G')
 
@@ -34,7 +36,7 @@ class Purchase(models.Model):
     
 class Stock(models.Model):
     product = models.OneToOneField(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="stock")
-    amount = models.IntegerField(default=0)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     class Meta:
         ordering = ("-id",)
@@ -67,9 +69,9 @@ class Sale(models.Model):
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="customer_sales")
     salelist = models.ForeignKey(SaleList, verbose_name="Siyahı", on_delete=models.CASCADE, related_name="salelist_sales", blank=True, null=True)
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_sales")
-    amount = models.IntegerField("Miqdar", default=0)
+    amount = models.DecimalField("Miqdar", max_digits=10, decimal_places=2, default=Decimal("0.00"))
     datetime = models.DateTimeField("Tarix və vaxt", blank=True, null=True)
-    price = models.FloatField("Satış qiyməti", blank=True, null=True)
+    price = models.DecimalField("Satış qiyməti", max_digits=10, decimal_places=2, blank=True, null=True)
     status = models.CharField("Status", choices=STATUS, max_length=1, default='G')
 
     class Meta:
@@ -83,7 +85,7 @@ class Sale(models.Model):
 class Payment(models.Model):
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="payments")
     datetime = models.DateTimeField("Tarix və vaxt")
-    amount = models.FloatField("Ödənilən məbləğ", default=0)
+    amount = models.DecimalField("Ödənilən məbləğ", max_digits=10, decimal_places=2, default=Decimal("0.00"))
 
     class Meta:
         ordering = ("-id",)
@@ -97,10 +99,10 @@ class ProductAction(models.Model):
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_actions")
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="customer_product_actions", blank=True, null=True)
     date = models.DateField("Tarix")
-    incoming_product_number = models.IntegerField("Gələn məhsul sayı", blank=True, null=True)
-    sold_product_number = models.IntegerField("Satılan məhsul sayı", blank=True, null=True)
-    remaining_product_number = models.IntegerField("Qalan məhsul sayı", blank=True, null=True)
-    return_product_number = models.IntegerField("Qaytarılan məhsul sayı", blank=True, null=True)
+    incoming_product_number = models.DecimalField("Gələn məhsul sayı", max_digits=10, decimal_places=2, blank=True, null=True)
+    sold_product_number = models.DecimalField("Satılan məhsul sayı", max_digits=10, decimal_places=2, blank=True, null=True)
+    remaining_product_number = models.DecimalField("Qalan məhsul sayı", max_digits=10, decimal_places=2, blank=True, null=True)
+    return_product_number = models.DecimalField("Qaytarılan məhsul sayı", max_digits=10, decimal_places=2, blank=True, null=True)
 
     action = models.CharField("Hərəkət", max_length=250, default="-")
 
@@ -127,11 +129,11 @@ class CustomerAction(models.Model):
     customer = models.ForeignKey(CustomUser, verbose_name="Müştəri", on_delete=models.CASCADE, related_name="customer_actions")
     product = models.ForeignKey(Product, verbose_name="Məhsul", on_delete=models.CASCADE, related_name="product_customer_actions", blank=True, null=True)
     date = models.DateField("Tarix")
-    product_price = models.FloatField("Məhsul qiyməti", blank=True, null=True)
-    payment_amount = models.FloatField("Ödənilən məbləğ", blank=True, null=True)
-    total_amount = models.FloatField("Ümumi gəlir", blank=True, null=True)
-    remaining_amount = models.FloatField("Qalan məbləğ", blank=True, null=True)
-    return_amount = models.FloatField("Qaytarılan məbləğ", blank=True, null=True)
+    product_price = models.DecimalField("Məhsul qiyməti", max_digits=10, decimal_places=2, blank=True, null=True)
+    payment_amount = models.DecimalField("Ödənilən məbləğ", max_digits=10, decimal_places=2, blank=True, null=True)
+    total_amount = models.DecimalField("Ümumi gəlir", max_digits=10, decimal_places=2, blank=True, null=True)
+    remaining_amount = models.DecimalField("Qalan məbləğ", max_digits=10, decimal_places=2, blank=True, null=True)
+    return_amount = models.DecimalField("Qaytarılan məbləğ", max_digits=10, decimal_places=2, blank=True, null=True)
 
     action = models.CharField("Hərəkət", max_length=250, default="-")
 
@@ -151,7 +153,7 @@ class ReturnBack(models.Model):
     sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name="returnbacks")
     date = models.DateField()
     reason = models.TextField(blank=True, null=True)
-    amount = models.IntegerField()
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(choices=STATUS, max_length=1, default="I")
 
     class Meta:
@@ -163,7 +165,7 @@ class ReturnBack(models.Model):
     
 class Expense(models.Model):
     name = models.CharField(max_length=200)
-    amount = models.FloatField()
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField()
 
     class Meta:
@@ -180,7 +182,7 @@ class SupplierPayment(models.Model):
         ('R', 'Rubl')
     )
     supplier = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="supplier_payments")
-    amount = models.FloatField()
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
     currency = models.CharField(max_length=1, choices=CURRENCIES, default="M")
     datetime = models.DateTimeField()
 

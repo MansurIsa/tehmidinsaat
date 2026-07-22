@@ -127,6 +127,7 @@ class PurchaseCreateAPIView(CreateAPIView):
     serializer_class = PurchaseCreateSerializer
 
     def create(self, request, *args, **kwargs):
+        
         purchase_data = {
             "supplier": request.data.get("supplier"),
             "product": request.data.get("product"),
@@ -160,8 +161,8 @@ class PurchaseCreateAPIView(CreateAPIView):
                 stock, created = Stock.objects.get_or_create(
                     product = product
                 )
-                product.amount = product.amount + int(purchase_data["amount"])
-                stock.amount = stock.amount + int(purchase_data["amount"])
+                product.amount = product.amount + Decimal(str(purchase_data["amount"]))
+                stock.amount = stock.amount + Decimal(str(purchase_data["amount"]))
                 stock.save()
 
                 # dt_data = purchase_data["date"].split("-")
@@ -173,7 +174,7 @@ class PurchaseCreateAPIView(CreateAPIView):
                 # )
 
             response_data = {
-                "message": f"{int(purchase_data['amount'])} Məhsul alındı: {product.name}"
+                "message": f"{Decimal(str(purchase_data["amount"]))} Məhsul alındı: {product.name}"
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -328,7 +329,7 @@ class PurchaseListAPIView(ListAPIView):
     serializer_class = PurchaseSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["product__name", "product__degree", "product__articles__name", "product__brand__name", "product__store__name", "product__category__name"]
+    search_fields = ["product__name", "product__articles__name",  "product__category__name"]
 
 from django.db.models import Max
 class PurchaseListListAPIView(ListAPIView):
@@ -671,7 +672,7 @@ class StockListAPIView(ListAPIView):
     serializer_class = StockSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["product__name", "product__articles__name", "product__brand__name"]
+    search_fields = ["product__name", "product__articles__name"]
 
 class AddToStockAPIView(APIView):
     def post(self, request):
@@ -758,15 +759,15 @@ class ShortSaleListAPIView(ListAPIView):
 
         return (
             Sale.objects
-            .select_related("customer", "product", "product__store")
+            .select_related("customer", "product", )
             .annotate(
                 sale_text=Concat(
                     customer_name,
                     Value(" - "),
                     F("product__name"),
                     Value(" - "),
-                    F("product__store__name"),
-                    Value(" ("),
+                    # F("product__store__name"),
+                    # Value(" ("),
                     F("datetime"),
                     Value(")"),
                     output_field=CharField()
@@ -936,7 +937,7 @@ class SaleCreateAPIView(CreateAPIView):
             # product.amount = product.amount - int(sale_data["amount"])
             # product.save()
             if hasattr(product, "stock"):
-                product.stock.amount = product.stock.amount - int(sale_data["amount"])
+                product.stock.amount = product.stock.amount - Decimal(str(sale_data["amount"]))
                 product.stock.save()
                 product.amount = product.stock.amount
                 product.save()
@@ -955,7 +956,7 @@ class SaleCreateAPIView(CreateAPIView):
                 customer = customer,
                 product = product,
                 date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))), 
-                product_price = int(sale_data["price"]) * int(sale_data["amount"])
+                product_price = Decimal(str(sale_data["price"])) * Decimal(str(sale_data["amount"]))
             )
             response_data = {"message": "Satış edildi."}
             return Response(response_data, status=status.HTTP_201_CREATED)
@@ -1081,6 +1082,7 @@ class BulkSaleAPIView(APIView):
             amounts = serializer.validated_data["amounts"]
             datetimes = serializer.validated_data["datetimes"]
             statuses = serializer.validated_data["statuses"]
+            
 
             seller = request.user
             customer = CustomUser.objects.get(id=customer_id)
@@ -1266,6 +1268,56 @@ class PaymentListAPIView(ListAPIView):
     filter_backends = [filters.SearchFilter]
     search_fields = ["customer__username", "customer__first_name", "customer__last_name"]
 
+# class PaymentCreateAPIView(CreateAPIView):
+#     queryset = Payment.objects.all()
+#     serializer_class = PaymentCreateSerializer
+
+#     def create(self, request, *args, **kwargs):
+#         payment_data = {
+#             "customer": request.data.get("customer"),
+#             "datetime": request.data.get("datetime"),
+#             "amount": request.data.get("amount")
+#         }
+#         serializer = self.get_serializer(data=payment_data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             customer = CustomUser.objects.get(id=payment_data["customer"])
+#             # customer_debt = sum([sale.price * sale.amount for sale in customer.customer_sales.all()])
+#             previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
+#             previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+#             previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+#             c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
+#             c_sales = Sale.objects.filter(customer=customer, status="S")
+#             c_payments = Payment.objects.filter(customer=customer)
+#             c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
+
+#             total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
+#             total_c_payments = sum(payment.amount for payment in c_payments)
+#             total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
+#             total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+
+#             total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
+#             dt = payment_data["datetime"].split("T")[0]
+#             dt_data = dt.split("-")
+
+#             customeractionlist = CustomerActionList.objects.create()
+
+#             CustomerAction.objects.create(
+#                 customeractionlist = customeractionlist,
+#                 customer = customer,
+#                 date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))),
+#                 payment_amount = payment_data["amount"],
+#                 total_amount = previous_total_amount + float(payment_data["amount"]),
+#                 remaining_amount = total_c_debt,
+#                 action = "Kassaya giriş"
+#             )
+
+#             response_data = {
+#                 "message": "Ödəniş əlavə olundu."
+#             }
+#             return Response(response_data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 class PaymentCreateAPIView(CreateAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentCreateSerializer
@@ -1280,34 +1332,50 @@ class PaymentCreateAPIView(CreateAPIView):
         if serializer.is_valid():
             serializer.save()
             customer = CustomUser.objects.get(id=payment_data["customer"])
-            # customer_debt = sum([sale.price * sale.amount for sale in customer.customer_sales.all()])
-            previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
-            previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
-            previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+            
+            # amount-i Decimal-ə çevirin
+            amount = Decimal(str(payment_data["amount"]))
+            
+            previous_input_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassaya giriş")]
+            previous_output_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+            previous_total_amount = Decimal('0.00') if not previous_input_amounts else sum(previous_input_amounts, Decimal('0.00')) - sum(previous_output_amounts, Decimal('0.00'))
+            
             c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
             c_sales = Sale.objects.filter(customer=customer, status="S")
             c_payments = Payment.objects.filter(customer=customer)
             c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
 
-            total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
-            total_c_payments = sum(payment.amount for payment in c_payments)
-            total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
-            total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+            total_c_sale = Decimal('0.00')
+            for sale in c_sales:
+                total_c_sale += sale.price * sale.amount
+            
+            total_c_payments = Decimal('0.00')
+            for payment in c_payments:
+                total_c_payments += payment.amount
+            
+            total_c_purchases = Decimal('0.00')
+            for purchase in c_purchases:
+                total_c_purchases += purchase.price * purchase.amount
+            
+            total_c_supplierpayments = Decimal('0.00')
+            for supplierpayment in c_supplierpayments:
+                total_c_supplierpayments += supplierpayment.amount
 
             total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
+            
             dt = payment_data["datetime"].split("T")[0]
             dt_data = dt.split("-")
 
             customeractionlist = CustomerActionList.objects.create()
 
             CustomerAction.objects.create(
-                customeractionlist = customeractionlist,
-                customer = customer,
-                date = datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))),
-                payment_amount = payment_data["amount"],
-                total_amount = previous_total_amount + float(payment_data["amount"]),
-                remaining_amount = total_c_debt,
-                action = "Kassaya giriş"
+                customeractionlist=customeractionlist,
+                customer=customer,
+                date=datetime.date(year=int(dt_data[0]), month=int(dt_data[1]), day=int(int(dt_data[2]))),
+                payment_amount=amount,  # Decimal
+                total_amount=previous_total_amount + amount,  # Decimal + Decimal
+                remaining_amount=total_c_debt,  # Decimal
+                action="Kassaya giriş"
             )
 
             response_data = {
@@ -1315,7 +1383,105 @@ class PaymentCreateAPIView(CreateAPIView):
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class PaymentRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
+#     queryset = Payment.objects.all()
+#     serializer_class = PaymentCreateSerializer
+#     lookup_field = "id"
+
+#     def update(self, request, *args, **kwargs):
+#         instance = self.get_object()
+#         serializer = self.get_serializer(instance, data=request.data, partial=True)
+#         if serializer.is_valid():
+#             old_customer = instance.customer
+#             old_amount = instance.amount
+#             serializer.save()
+#             customer = serializer.validated_data.get("customer")
+#             amount = serializer.validated_data.get("amount")
+
+#             dt = serializer.validated_data["datetime"].date()
+
+#             previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
+#             previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+#             previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+#             c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
+#             c_sales = Sale.objects.filter(customer=customer, status="S")
+#             c_payments = Payment.objects.filter(customer=customer)
+#             c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
+
+#             total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
+#             total_c_payments = sum(payment.amount for payment in c_payments)
+#             total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
+#             total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+
+#             total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
+
+#             if customer != old_customer:
+#                 customeractionlist = CustomerActionList.objects.create()
+#                 CustomerAction.objects.create(
+#                     customeractionlist = customeractionlist,
+#                     customer = old_customer,
+#                     date = dt,
+#                     payment_amount = old_amount,
+#                     total_amount = previous_total_amount + float(amount),
+#                     remaining_amount = total_c_debt,
+#                     action = "Kassa girişi ləğv edildi"
+#                 )
+#                 customeractionlist = CustomerActionList.objects.create()
+#                 CustomerAction.objects.create(
+#                     customeractionlist = customeractionlist,
+#                     customer = customer,
+#                     date = dt,
+#                     payment_amount = amount,
+#                     total_amount = previous_total_amount + float(amount),
+#                     remaining_amount = total_c_debt,
+#                     action = "Kassaya giriş"
+#                 )
+#             else:
+#                 customeractionlist = CustomerActionList.objects.create()
+#                 CustomerAction.objects.create(
+#                     customeractionlist = customeractionlist,
+#                     customer = customer,
+#                     date = dt,
+#                     payment_amount = amount - old_amount,
+#                     total_amount = previous_total_amount + float(amount-old_amount),
+#                     remaining_amount = total_c_debt,
+#                     action = "Kassaya giriş"
+#                 )
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+#     def delete(self, request, *args, **kwargs):
+#         instance = self.get_object()
+#         customeractionlist = CustomerActionList.objects.create()
+
+#         customer = instance.customer
+
+#         previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
+#         previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+#         previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+#         c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
+#         c_sales = Sale.objects.filter(customer=customer, status="S")
+#         c_payments = Payment.objects.filter(customer=customer)
+#         c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
+
+#         total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
+#         total_c_payments = sum(payment.amount for payment in c_payments)
+#         total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
+#         total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+
+#         total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
+        
+#         CustomerAction.objects.create(
+#             customeractionlist = customeractionlist,
+#             customer = customer,
+#             date = timezone.now(),
+#             payment_amount = instance.amount,
+#             total_amount = previous_total_amount - instance.amount,
+#             remaining_amount = total_c_debt + instance.amount,
+#             action = "Kassa girişi ləğv edildi"
+#         )
+#         return super().delete(request, *args, **kwargs)
+
 class PaymentRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
     queryset = Payment.objects.all()
     serializer_class = PaymentCreateSerializer
@@ -1330,55 +1496,71 @@ class PaymentRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
             serializer.save()
             customer = serializer.validated_data.get("customer")
             amount = serializer.validated_data.get("amount")
+            
+            # amount Decimal-dir, amma əgər stringdirsə çevirin
+            if isinstance(amount, str):
+                amount = Decimal(amount)
 
             dt = serializer.validated_data["datetime"].date()
 
-            previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
-            previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
-            previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+            previous_input_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassaya giriş")]
+            previous_output_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+            previous_total_amount = Decimal('0.00') if not previous_input_amounts else sum(previous_input_amounts, Decimal('0.00')) - sum(previous_output_amounts, Decimal('0.00'))
+            
             c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
             c_sales = Sale.objects.filter(customer=customer, status="S")
             c_payments = Payment.objects.filter(customer=customer)
             c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
 
-            total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
-            total_c_payments = sum(payment.amount for payment in c_payments)
-            total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
-            total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+            total_c_sale = Decimal('0.00')
+            for sale in c_sales:
+                total_c_sale += sale.price * sale.amount
+            
+            total_c_payments = Decimal('0.00')
+            for payment in c_payments:
+                total_c_payments += payment.amount
+            
+            total_c_purchases = Decimal('0.00')
+            for purchase in c_purchases:
+                total_c_purchases += purchase.price * purchase.amount
+            
+            total_c_supplierpayments = Decimal('0.00')
+            for supplierpayment in c_supplierpayments:
+                total_c_supplierpayments += supplierpayment.amount
 
             total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
 
             if customer != old_customer:
                 customeractionlist = CustomerActionList.objects.create()
                 CustomerAction.objects.create(
-                    customeractionlist = customeractionlist,
-                    customer = old_customer,
-                    date = dt,
-                    payment_amount = old_amount,
-                    total_amount = previous_total_amount + float(amount),
-                    remaining_amount = total_c_debt,
-                    action = "Kassa girişi ləğv edildi"
+                    customeractionlist=customeractionlist,
+                    customer=old_customer,
+                    date=dt,
+                    payment_amount=old_amount,
+                    total_amount=previous_total_amount + amount,
+                    remaining_amount=total_c_debt,
+                    action="Kassa girişi ləğv edildi"
                 )
                 customeractionlist = CustomerActionList.objects.create()
                 CustomerAction.objects.create(
-                    customeractionlist = customeractionlist,
-                    customer = customer,
-                    date = dt,
-                    payment_amount = amount,
-                    total_amount = previous_total_amount + float(amount),
-                    remaining_amount = total_c_debt,
-                    action = "Kassaya giriş"
+                    customeractionlist=customeractionlist,
+                    customer=customer,
+                    date=dt,
+                    payment_amount=amount,
+                    total_amount=previous_total_amount + amount,
+                    remaining_amount=total_c_debt,
+                    action="Kassaya giriş"
                 )
             else:
                 customeractionlist = CustomerActionList.objects.create()
                 CustomerAction.objects.create(
-                    customeractionlist = customeractionlist,
-                    customer = customer,
-                    date = dt,
-                    payment_amount = amount - old_amount,
-                    total_amount = previous_total_amount + float(amount-old_amount),
-                    remaining_amount = total_c_debt,
-                    action = "Kassaya giriş"
+                    customeractionlist=customeractionlist,
+                    customer=customer,
+                    date=dt,
+                    payment_amount=amount - old_amount,
+                    total_amount=previous_total_amount + (amount - old_amount),
+                    remaining_amount=total_c_debt,
+                    action="Kassaya giriş"
                 )
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -1389,34 +1571,43 @@ class PaymentRetrieveUpdateDestroyAPIView(RetrieveUpdateDestroyAPIView):
 
         customer = instance.customer
 
-        previous_input_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassaya giriş")]
-        previous_output_amounts = [action.payment_amount if action.payment_amount else 0 for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
-        previous_total_amount = 0 if not previous_input_amounts else sum(previous_input_amounts, start=0) - sum(previous_output_amounts, 0)
+        previous_input_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassaya giriş")]
+        previous_output_amounts = [action.payment_amount if action.payment_amount else Decimal('0.00') for action in customer.customer_actions.filter(action="Kassa girişi ləğv edildi")]
+        previous_total_amount = Decimal('0.00') if not previous_input_amounts else sum(previous_input_amounts, Decimal('0.00')) - sum(previous_output_amounts, Decimal('0.00'))
+        
         c_purchases = Purchase.objects.filter(supplier=customer, status="A", purchaselist__currency="M")
         c_sales = Sale.objects.filter(customer=customer, status="S")
         c_payments = Payment.objects.filter(customer=customer)
         c_supplierpayments = SupplierPayment.objects.filter(supplier=customer)
 
-        total_c_sale = sum(sale.price * sale.amount for sale in c_sales)
-        total_c_payments = sum(payment.amount for payment in c_payments)
-        total_c_purchases = sum(purchase.price * purchase.amount for purchase in c_purchases)
-        total_c_supplierpayments = sum(supplierpayment.amount for supplierpayment in c_supplierpayments)
+        total_c_sale = Decimal('0.00')
+        for sale in c_sales:
+            total_c_sale += sale.price * sale.amount
+        
+        total_c_payments = Decimal('0.00')
+        for payment in c_payments:
+            total_c_payments += payment.amount
+        
+        total_c_purchases = Decimal('0.00')
+        for purchase in c_purchases:
+            total_c_purchases += purchase.price * purchase.amount
+        
+        total_c_supplierpayments = Decimal('0.00')
+        for supplierpayment in c_supplierpayments:
+            total_c_supplierpayments += supplierpayment.amount
 
         total_c_debt = total_c_sale - total_c_payments - total_c_purchases + total_c_supplierpayments
         
         CustomerAction.objects.create(
-            customeractionlist = customeractionlist,
-            customer = customer,
-            date = timezone.now(),
-            payment_amount = instance.amount,
-            total_amount = previous_total_amount - float(instance.amount),
-            remaining_amount = total_c_debt + instance.amount,
-            action = "Kassa girişi ləğv edildi"
+            customeractionlist=customeractionlist,
+            customer=customer,
+            date=timezone.now(),
+            payment_amount=instance.amount,
+            total_amount=previous_total_amount - instance.amount,
+            remaining_amount=total_c_debt + instance.amount,
+            action="Kassa girişi ləğv edildi"
         )
         return super().delete(request, *args, **kwargs)
-
-                
-
 class ProductActionListAPIView(ListAPIView):
 
     def get_queryset(self):
@@ -1471,7 +1662,7 @@ class ReturnBackCreateAPIView(CreateAPIView):
             amount = request.data.get("amount")
             rb_status = instance.status # returnback status
             sale = instance.sale
-            sale_amount = sale.amount - int(amount)
+            sale_amount = sale.amount - Decimal(str(amount))
             sale.amount = sale_amount
             sale.save()
             if rb_status == "I":
@@ -1707,7 +1898,7 @@ class DashboardAPIView(APIView):
     permission_classes = (IsAdminUser,)
     
 class SaleDynamicsAPIView(APIView):
-    def get(self, request, seller_id, filter_data, brand_id):
+    def get(self, request, seller_id, filter_data):
         user = get_object_or_404(CustomUser, id=seller_id)
         if filter_data == "A":
             months = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "İyun", "İyul", "Avqust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"]
@@ -1715,39 +1906,24 @@ class SaleDynamicsAPIView(APIView):
             if user.is_superuser:
                 for i in range(len(months)):
                     year = datetime.datetime.now().year
-                    if brand_id:
-                        sales = Sale.objects.filter(
-                            product__brand__id = brand_id,
-                            datetime__date__month = i + 1,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
-                    else:
-                        sales = Sale.objects.filter(
-                            datetime__date__month = i + 1,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
+                   
+                    sales = Sale.objects.filter(
+                        datetime__date__month = i + 1,
+                        datetime__date__year = year,
+                        status = "S"
+                    )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             elif user.is_staff:
                 for i in range(len(months)):
                     year = datetime.datetime.now().year
-                    if brand_id:
-                        sales = Sale.objects.filter(
-                            seller = user,
-                            product__brand__id = brand_id,
-                            datetime__date__month = i + 1,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
-                    else:
-                        sales = Sale.objects.filter(
-                            seller = user,
-                            datetime__date__month = i + 1,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
+                    
+                    sales = Sale.objects.filter(
+                        seller = user,
+                        datetime__date__month = i + 1,
+                        datetime__date__year = year,
+                        status = "S"
+                    )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             else:
@@ -1780,17 +1956,11 @@ class SaleDynamicsAPIView(APIView):
                 all_sale_years.sort()
                 total_sale_amounts = []
                 for year in all_sale_years:
-                    if brand_id:
-                        sales = Sale.objects.filter(
-                            product__brand__id = brand_id,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
-                    else:
-                        sales = Sale.objects.filter(
-                            datetime__date__year = year,
-                            status = "S"
-                        )
+                   
+                    sales = Sale.objects.filter(
+                        datetime__date__year = year,
+                        status = "S"
+                    )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             else:
@@ -1799,19 +1969,12 @@ class SaleDynamicsAPIView(APIView):
                 all_sale_years.sort()
                 total_sale_amounts = []
                 for year in all_sale_years:
-                    if brand_id:
-                        sales = Sale.objects.filter(
-                            seller = user,
-                            product__brand__id = brand_id,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
-                    else:
-                        sales = Sale.objects.filter(
-                            seller = user,
-                            datetime__date__year = year,
-                            status = "S"
-                        )
+                   
+                    sales = Sale.objects.filter(
+                        seller = user,
+                        datetime__date__year = year,
+                        status = "S"
+                    )
                     total_sale_amount = sum([sale.price * sale.amount for sale in sales])
                     total_sale_amounts.append(total_sale_amount)
             response_data = {
@@ -1921,7 +2084,7 @@ class StockOutProductsListAPIView(ListAPIView):
     serializer_class = ProductSerializer
     pagination_class = CustomPagination
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "articles__name", "brand__name", "store__name", "category__name"]
+    search_fields = ["name", "articles__name",  "category__name"]
 
 class SupplierPaymentListAPIView(ListAPIView):
     queryset = SupplierPayment.objects.all()

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from core.models import (
     CustomUser, SiteSettings, Banner, ProductCategory,
-    Brand, Store, Product, ProductAbout, Application, SocialMedia, Advantage,
+     Product, ProductAbout, Application, SocialMedia, Advantage,
     Activity, Service, Mission, BasketItem, Article, Order, OrderItem, WantedProduct
 )
 from accounting.models import ReturnBack
@@ -111,15 +111,15 @@ class ProductCategorySerializer(serializers.ModelSerializer):
         model = ProductCategory
         fields = "__all__"
 
-class BrandSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Brand
-        fields = "__all__"
+# class BrandSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Brand
+#         fields = "__all__"
 
-class StoreSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Store
-        fields = "__all__"
+# class StoreSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Store
+#         fields = "__all__"
 
 class ArticleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -139,17 +139,29 @@ class ProductAboutSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class ProductListSerializer(serializers.ModelSerializer):
-    brand_name = serializers.CharField(source="brand.name", read_only=True)
-    article_names = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name", source="articles")
-    
+    article_names = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field="name",
+        source="articles"
+    )
+
     class Meta:
         model = Product
-        fields = ('id', 'name', "degree", 'image', 'brand_name', 'article_names', 'price', 'discount_price', 'amount')
-
+        fields = (
+            "id",
+            "name",
+            "image",
+            "unit",
+            "amount",
+            "price",
+            "discount_price",
+            "article_names",
+        )
 class ProductSerializer(serializers.ModelSerializer):
     category = ProductCategorySerializer()
-    brand = BrandSerializer()
-    store = StoreSerializer()
+    # brand = BrandSerializer()
+    # store = StoreSerializer()
     articles = ArticleSerializer(many=True)
     product_abouts = ProductAboutSerializer(many=True)
 
@@ -160,12 +172,29 @@ class ProductSerializer(serializers.ModelSerializer):
 class ProductCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ("name", "degree", "image", "category", "brand", "store")
+        fields = ("name", "image", "category", "unit")
+    def validate(self, attrs):
+        unit = attrs.get("unit", "piece")
+        # yeni məhsul yaradılanda amount adətən 0-dır, əsas nəzarət update/purchase zamanı olacaq
+        return attrs
 
 class ProductUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
+    def validate(self, attrs):
+        unit = attrs.get("unit", self.instance.unit if self.instance else "piece")
+        amount = attrs.get("amount", self.instance.amount if self.instance else None)
+        if amount is not None:
+            from core.validators import validate_quantity_for_unit
+            # instance-a bənzər fake obyekt yaratmadan birbaşa yoxlayaq
+            from decimal import Decimal
+            amt = Decimal(str(amount))
+            if unit == "piece" and amt != amt.to_integral_value():
+                raise serializers.ValidationError({
+                    "amount": "Ədəd üçün miqdar tam ədəd olmalıdır."
+                })
+        return attrs
 
 class ApplicationSerializer(serializers.ModelSerializer):
     class Meta:
