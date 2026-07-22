@@ -174,7 +174,7 @@ class PurchaseCreateAPIView(CreateAPIView):
                 # )
 
             response_data = {
-                "message": f"{Decimal(str(purchase_data["amount"]))} Məhsul alındı: {product.name}"
+                "message": f"{Decimal(str(purchase_data['amount']))} Məhsul alındı: {product.name}"
             }
             return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
